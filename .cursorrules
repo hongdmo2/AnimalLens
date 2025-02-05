@@ -1,0 +1,31 @@
+// .cursorrules (또는 .cursorrc)
+{
+    
+  // 1) 패키지 매니저 설정
+  // Cursor가 명령어를 자동 생성할 때 'npm'을 우선적으로 사용하도록 권장
+  "packageManager": "pnpm",
+  // 2) 프로젝트 설정
+  "project": {
+    "name": "animallens",
+    "description": "Animal Lens is a web application that allows users to upload images and detect animals in the images.",
+    "version": "0.1.0",
+    "author": "Changoh Hong"
+  },
+  // 3) Terminal 설정
+  "terminal": "powershell",
+  
+      // 4) 기본 디렉토리 구조
+  // Cursor가 파일 생성 시 참고할 디렉토리 이름 
+  NotePads 에 '현재 디렉토리 구조를 참고해라',
+  //6) 항상 주석을 달아라
+  //주석을 필요한 부분에 내가 이해할수있도록 어떻게 어떤 기능등을 하는지 주석을 달아라 
+
+
+  // 5) 기타 옵션
+  // 필요 시 추가: Git 브랜치 네이밍 규칙, 커밋 메시지 규칙 등
+  "gitBranchRules": {
+    "featurePrefix": "feat/",
+    "bugfixPrefix": "fix/",
+    "releasePrefix": "release/"
+  }
+}
