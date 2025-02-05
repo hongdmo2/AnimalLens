@@ -1,9 +1,13 @@
 import psycopg2
 import os
 from dotenv import load_dotenv
+#목적
+#테이블 스키마 변경
+#테이블 간 관계 변경
 
 # .env 파일 로드
 load_dotenv()
+
 
 def run_migration():
     # RDS 연결 정보 (기본 DB)
