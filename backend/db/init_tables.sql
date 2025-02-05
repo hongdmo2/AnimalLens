@@ -1,3 +1,10 @@
+-- 주의: 이 스크립트는 최초 테이블 설정 시 한 번만 실행합니다.
+-- 테이블 구조 변경이 필요한 경우 migrate.py를 사용하세요.
+--목적
+--테이블 스키마 정의
+--테이블 간 관계 설정
+
+
 -- 기존 테이블 삭제
 DROP TABLE IF EXISTS analysis_results;
 DROP TABLE IF EXISTS animals;
