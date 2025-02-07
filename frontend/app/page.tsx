@@ -18,7 +18,7 @@ export default function Home() {
         <UploadForm />
 
         <footer className="text-center text-sm text-gray-500 mt-8">
-          Powered by AI Vision – Discover the wonders of the animal kingdom.
+          Changoh-Hong - Discover the wonders of the animal kingdom.
         </footer>
       </div>
     </main>

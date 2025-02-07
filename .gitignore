@@ -1,3 +1,86 @@
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Docker
+postgres_data/
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+*.log
+logs/
+.pytest_cache/
+coverage/
+
+# Node
+.next/
+out/
+.DS_Store
+*.pem
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.turbo
+.vercel
+coverage
+storybook-static/
+
+# IDE
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# AWS
+.aws/
+*.pem
+animallens-ec2-key.pem
+aws-keys.json
+credentials.csv
+
+# Project specific
+docs/
+tmp/
+temp/
+.env*
+!.env.example
+
 # Python
 __pycache__/
 *.py[cod]
@@ -23,7 +106,6 @@ var/
 .venv
 
 # Node
-node_modules/
 .next/
 out/
 .DS_Store
@@ -37,13 +119,13 @@ yarn-debug.log*
 yarn-error.log*
 
 # IDE
-.idea/
-.vscode/
 *.swp
 *.swo
 
 # AWS
 .aws/
+*.pem
+animallens-ec2-key.pem
 
 # Project specific
 docs/ 

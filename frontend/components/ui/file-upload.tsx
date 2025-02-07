@@ -1,17 +1,32 @@
-"use client"; // 클라이언트 사이드 컴포넌트임을 명시
+/**
+ * FileUpload Component
+ * 
+ * A reusable file upload component that provides drag and drop functionality.
+ * Built with react-dropzone for handling file uploads.
+ * 
+ * Features:
+ * - Drag and drop file upload
+ * - File preview functionality
+ * - Loading state handling
+ * - Customizable styling
+ * - File type restrictions
+ * - Accessibility support
+ */
+
+"use client";
 
 import { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone"; // 드래그 앤 드롭 기능을 위한 라이브러리
-import { Cloud, File, Loader2 } from "lucide-react"; // UI 아이콘
+import { useDropzone } from "react-dropzone";
+import { Cloud, File, Loader2 } from "lucide-react";
 import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-// 컴포넌트 props 타입 정의
+// Define component props interface
 interface FileUploadProps {
-  onChange: (file?: File) => void; // 파일 선택 시 호출될 콜백
-  value?: File;                    // 현재 선택된 파일
-  disabled?: boolean;              // 비활성화 상태
+  onChange: (file?: File) => void;  // Callback function when file is selected
+  value?: File;                     // Currently selected file
+  disabled?: boolean;               // Disabled state of the upload component
 }
 
 export function FileUpload({
@@ -19,17 +34,17 @@ export function FileUpload({
   value,
   disabled
 }: FileUploadProps) {
-  // 상태 관리
-  const [preview, setPreview] = useState<string>();  // 이미지 미리보기 URL
-  const [loading, setLoading] = useState(false);     // 로딩 상태
+  // State management
+  const [preview, setPreview] = useState<string>();  // Image preview URL
+  const [loading, setLoading] = useState(false);     // Loading state
 
-  // 파일이 드롭되거나 선택되었을 때 실행되는 콜백
+  // Handle file drop callback
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     
     if (file) {
       setLoading(true);
-      // FileReader를 사용하여 이미지 미리보기 생성
+      // Create file preview using FileReader
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
@@ -40,29 +55,29 @@ export function FileUpload({
     }
   }, [onChange]);
 
-  // react-dropzone 설정
+  // Configure dropzone settings
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif'] // 허용되는 파일 형식
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif']  // Accepted file types
     },
-    maxFiles: 1,  // 최대 1개 파일만 허용
+    maxFiles: 1,  // Maximum number of files allowed
     disabled
   });
 
   return (
-    // 드래그 앤 드롭 영역
+    // Dropzone container
     <div
       {...getRootProps()}
       className={cn(
         "border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition cursor-pointer",
-        isDragActive && "border-primary",        // 드래그 중일 때 스타일
-        disabled && "opacity-50 cursor-default"  // 비활성화 상태 스타일
+        isDragActive && "border-primary",        // Active drag state styling
+        disabled && "opacity-50 cursor-default"  // Disabled state styling
       )}
     >
       <input {...getInputProps()} />
       
-      {/* 로딩 상태 UI */}
+      {/* Loading state UI */}
       {loading && (
         <div className="flex flex-col items-center">
           <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
@@ -70,7 +85,7 @@ export function FileUpload({
         </div>
       )}
       
-      {/* 초기 상태 UI */}
+      {/* Initial state UI */}
       {!loading && !preview && (
         <div className="flex flex-col items-center">
           <Cloud className="h-10 w-10 text-gray-400" />
@@ -83,7 +98,7 @@ export function FileUpload({
         </div>
       )}
       
-      {/* 이미지 미리보기 UI */}
+      {/* Image preview UI */}
       {!loading && preview && (
         <div className="relative h-64 w-full">
           <Image
