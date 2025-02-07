@@ -1,0 +1,30 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+.git
+.gitignore
+.pytest_cache
+.coverage
+htmlcov/
+# AWS credentials
+*.pem
+animallens-ec2-key.pem
+aws-keys.json
+credentials.csv
+# Dev/Test
+tests/
+.pytest_cache
+coverage
+.coverage
+htmlcov/
+# Temp files
+tmp/
+temp/
+.log
+logs/ 

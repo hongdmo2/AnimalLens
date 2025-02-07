@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Zldzhd12!
+      - POSTGRES_DB=animallens
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=${BACKEND_URL}
+    command: sh -c "pnpm install && pnpm dev"
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - .env.development:/app/.env.development  # 환경 변수 파일을 컨테이너 내부로 복사
+    environment:
+      - ENVIRONMENT=development
+    env_file:
+      - .env.development
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data: 

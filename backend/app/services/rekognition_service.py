@@ -1,6 +1,20 @@
+"""
+AWS Rekognition Service Module
+
+This module handles image analysis using AWS Rekognition service.
+It provides functionality to detect labels (objects, scenes, concepts) in images.
+
+Features:
+- Image label detection from S3 objects
+- Confidence score filtering
+- Error handling for AWS Rekognition operations
+- Support for multiple label detection
+"""
+
 import boto3
 from ..config import settings
 
+# Initialize AWS Rekognition client with credentials
 rekognition_client = boto3.client(
     'rekognition',
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -9,13 +23,25 @@ rekognition_client = boto3.client(
 )
 
 async def detect_labels(image_url: str) -> list:
-    """이미지에서 레이블 감지"""
-    # S3 URL에서 버킷 이름과 객체 키 추출
-    # 예: https://bucket-name.s3.region.amazonaws.com/path/to/image.jpg
+    """
+    Detect labels in an image stored in S3.
+    
+    Args:
+        image_url (str): Full S3 URL of the image
+            Format: https://bucket-name.s3.region.amazonaws.com/path/to/image.jpg
+    
+    Returns:
+        list: List of detected labels with confidence scores
+        
+    Raises:
+        Exception: If Rekognition analysis fails
+    """
+    # Extract bucket name and object key from S3 URL
     bucket = settings.S3_BUCKET
     key = image_url.split(f"{bucket}.s3.{settings.AWS_REGION}.amazonaws.com/")[1]
     
     try:
+        # Call Rekognition API to detect labels
         response = rekognition_client.detect_labels(
             Image={
                 'S3Object': {
@@ -27,6 +53,7 @@ async def detect_labels(image_url: str) -> list:
             MinConfidence=70
         )
         
+        # Format and return the results
         return [
             {
                 "name": label["Name"],
@@ -35,5 +62,5 @@ async def detect_labels(image_url: str) -> list:
             for label in response["Labels"]
         ]
     except Exception as e:
-        print(f"Rekognition 분석 중 에러 발생: {str(e)}")
+        print(f"Error during Rekognition analysis: {str(e)}")
         raise 

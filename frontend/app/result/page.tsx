@@ -1,3 +1,20 @@
+/**
+ * Result Page Component
+ * 
+ * This component displays the analysis results for an uploaded image.
+ * It fetches and displays the AI analysis results, including:
+ * - Detected animal information
+ * - Confidence score
+ * - Detailed animal data (species, habitat, diet, etc.)
+ * 
+ * Features:
+ * - Dynamic result fetching based on URL parameters
+ * - Loading state handling
+ * - Error state management
+ * - Responsive image display
+ * - Fallback image handling
+ */
+
 "use client"
 
 import { useSearchParams } from "next/navigation"
@@ -6,14 +23,16 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { getAnalysisResult, type AnalysisResult } from "@/lib/api"
 import { PawPrint, AlertCircle, Loader2 } from "lucide-react"
-
+import Image from 'next/image'
 
 export default function ResultPage() {
+  // State and parameter management
   const searchParams = useSearchParams()
   const id = searchParams.get("id")
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string>()
 
+  // Fetch analysis result on component mount
   useEffect(() => {
     const fetchResult = async () => {
       try {
@@ -30,6 +49,7 @@ export default function ResultPage() {
     fetchResult()
   }, [id])
 
+  // Error state UI
   if (error) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-blue-100 to-purple-100">
@@ -50,6 +70,7 @@ export default function ResultPage() {
     )
   }
 
+  // Loading state UI
   if (!result) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-blue-100 to-purple-100">
@@ -63,9 +84,11 @@ export default function ResultPage() {
     )
   }
 
+  // Success state UI
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-blue-100 to-purple-100">
       <div className="w-full max-w-3xl space-y-8 bg-white rounded-2xl shadow-xl p-8 transition-all duration-300 hover:shadow-2xl">
+        {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2">
             <PawPrint className="w-10 h-10 text-blue-600" />
@@ -75,17 +98,15 @@ export default function ResultPage() {
           </div>
         </div>
 
-        {/* 이미지 표시 */}
+        {/* Image Display */}
         <div className="relative overflow-hidden rounded-lg bg-gray-100 shadow-inner">
           {result.image_url ? (
-            <img
-              src={result.image_url || "/placeholder.svg"}
-              alt={result.label}
-              className="w-full h-auto object-contain"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = "/placeholder-image.png" // 에러 시 대체 이미지
-              }}
+            <Image 
+              src={result.image_url} 
+              alt="Uploaded" 
+              width={500}  // 적절한 크기로 조정
+              height={300} 
+              priority
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -94,7 +115,7 @@ export default function ResultPage() {
           )}
         </div>
 
-        {/* 분석 결과 */}
+        {/* Analysis Results */}
         <div className="space-y-6">
           <div className="bg-gray-50 rounded-lg p-6 space-y-4 shadow-inner">
             <h2 className="text-2xl font-semibold text-blue-600">Detected: {result.label}</h2>
@@ -102,7 +123,7 @@ export default function ResultPage() {
             {result.message && <p className="text-purple-600 mt-2 italic">{result.message}</p>}
           </div>
 
-          {/* 동물 정보 (알려진 동물인 경우에만 표시) */}
+          {/* Animal Information (displayed only for known animals) */}
           {result.animal && (
             <div className="bg-gray-50 rounded-lg p-6 space-y-4 shadow-inner">
               <h2 className="text-2xl font-semibold text-blue-600">Animal Information</h2>
@@ -124,7 +145,7 @@ export default function ResultPage() {
           )}
         </div>
 
-        {/* 새로운 분석 버튼 */}
+        {/* New Analysis Button */}
         <div className="flex justify-center">
           <Link href="/">
             <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-2 px-6 rounded-lg transition-all duration-300 ease-in-out hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">

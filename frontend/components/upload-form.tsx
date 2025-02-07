@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * UploadForm Component
+ * 
+ * This component handles the image upload functionality for animal detection.
+ * Features:
+ * - File selection via drag & drop or file browser
+ * - File validation (size & type)
+ * - Upload progress tracking
+ * - Error handling
+ * - Redirects to results page after successful upload
+ */
+
 import { useState } from "react";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Button } from "@/components/ui/button";
@@ -7,50 +19,50 @@ import { uploadImage } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
 export function UploadForm() {
-  // 상태 관리
-  const [file, setFile] = useState<File>();              // 선택된 파일 상태
-  const [isUploading, setIsUploading] = useState(false); // 업로드 진행 상태
-  const [error, setError] = useState<string>();          // 에러 메시지 상태
-  const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행률 상태
+  // State management
+  const [file, setFile] = useState<File>();              // Selected file state
+  const [isUploading, setIsUploading] = useState(false); // Upload progress state
+  const [error, setError] = useState<string>();          // Error message state
+  const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage state
   
-  // 파일 선택/드래그 앤 드롭 핸들러
+  // File selection/drag & drop handler
   const handleFileChange = (selectedFile?: File) => {
     if (selectedFile) {
-      // 파일 크기 제한: 5MB
+      // File size limit: 5MB
       if (selectedFile.size > 5 * 1024 * 1024) {
         setError("File size must be less than 5MB");
         return;
       }
-      // 이미지 파일 타입 검증
+      // Image file type validation
       if (!selectedFile.type.startsWith('image/')) {
         setError("Only image files are allowed");
         return;
       }
     }
     setFile(selectedFile);
-    setError(undefined); // 새 파일 선택시 에러 초기화
+    setError(undefined); // Reset error when new file is selected
   };
 
-  // 이미지 분석 시작 핸들러
+  // Image analysis start handler
   const handleAnalyze = async () => {
     if (!file) return;
 
-    // 업로드 상태 초기화
+    // Initialize upload state
     setIsUploading(true);
     setError(undefined);
     setUploadProgress(0);
 
     try {
-      // 파일 업로드 및 진행률 업데이트
+      // Upload file and update progress
       const response = await uploadImage(file, (progress) => {
         setUploadProgress(progress);
       });
-      // 업로드 성공 시 결과 페이지로 이동
+      // Redirect to result page on successful upload
       window.location.href = `/result?id=${response.upload_id}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      // 상태 초기화
+      // Reset states
       setIsUploading(false);
       setUploadProgress(0);
     }
@@ -58,38 +70,38 @@ export function UploadForm() {
 
   return (
     <div className="space-y-4">
-      {/* 파일 업로드 컴포넌트 */}
+      {/* File upload component */}
       <FileUpload
         onChange={handleFileChange}
         value={file}
         disabled={isUploading}
       />
       
-      {/* 에러 메시지 표시 */}
+      {/* Error message display */}
       {error && (
         <div className="text-red-500 text-sm text-center">
           {error}
         </div>
       )}
       
-      {/* 업로드 진행률 표시 */}
+      {/* Upload progress display */}
       {isUploading && uploadProgress > 0 && (
         <div className="w-full max-w-xs mx-auto">
-          {/* 진행률 바 */}
+          {/* Progress bar */}
           <div className="bg-gray-200 rounded-full h-2.5">
             <div
               className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
-          {/* 진행률 퍼센트 */}
+          {/* Progress percentage */}
           <p className="text-sm text-gray-500 text-center mt-1">
             {Math.round(uploadProgress)}%
           </p>
         </div>
       )}
       
-      {/* 분석 버튼 */}
+      {/* Analysis button */}
       <div className="flex justify-center">
         <Button
           size="lg"
