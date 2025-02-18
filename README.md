@@ -12,6 +12,10 @@
 
 ---
 
+# **Preview**
+![image](https://github.com/user-attachments/assets/df5eef92-baba-4e6c-8baa-8d3bf0526fc3)
+
+
 ## 🛠 Tech Stack
 
 ### **Frontend**
