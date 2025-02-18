@@ -1,18 +1,18 @@
 import psycopg2
 import os
 from dotenv import load_dotenv
-#목적
-#테이블 스키마 변경
-#테이블 간 관계 변경
+# purpose
+# change table schema
+# change table relationships
 
-# .env 파일 로드
-load_dotenv()
+# load .env.development file
+load_dotenv('.env.development')
 
 
 def run_migration():
-    # RDS 연결 정보 (기본 DB)
+    # RDS connection information (default DB)
     conn_params = {
-        'dbname': 'postgres',
+        'dbname': os.getenv('DB_NAME', 'animallens'),
         'user': os.getenv('DB_USER'),
         'password': os.getenv('DB_PASSWORD'),
         'host': os.getenv('DB_HOST'),
@@ -20,31 +20,12 @@ def run_migration():
     }
     
     try:
-        # PostgreSQL 서버에 연결
+        # connect to PostgreSQL server
         conn = psycopg2.connect(**conn_params)
         conn.autocommit = True
         cur = conn.cursor()
         
-        # 1단계: 데이터베이스 생성
-        try:
-            with open('db/create_db.sql', 'r', encoding='utf-8') as file:
-                create_db_sql = file.read()
-            cur.execute(create_db_sql)
-            print("Database created successfully!")
-        except psycopg2.errors.DuplicateDatabase:
-            print("Database already exists, continuing...")
-        
-        # 연결 종료
-        cur.close()
-        conn.close()
-        
-        # 2단계: 새 데이터베이스에 연결하여 테이블 생성
-        conn_params['dbname'] = 'animallens'
-        conn = psycopg2.connect(**conn_params)
-        conn.autocommit = True
-        cur = conn.cursor()
-        
-        # 테이블 생성 및 초기 데이터 삽입
+        # create tables and insert initial data
         with open('db/init_tables.sql', 'r', encoding='utf-8') as file:
             init_tables_sql = file.read()
         cur.execute(init_tables_sql)

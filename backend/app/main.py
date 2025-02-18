@@ -1,115 +1,113 @@
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.middleware.cors import CORSMiddleware
-from .services import s3_service, rekognition_service
-from .database import database
+from .database import database, AsyncSessionLocal
+from sqlalchemy.orm import joinedload
 from .config import settings
-from .models import AnalysisResult
 from .logger import logger  # 이것만 사용
 from PIL import Image
 import io
-"""
-FastAPI 메인 애플리케이션 파일
-역할:
-1. API 엔드포인트 정의 (/api/upload, /api/results/{id} 등)
-2. 이미지 업로드 및 분석 프로세스 조정
-3. 에러 처리 및 응답 관리
-4. CORS 및 기타 미들웨어 설정
-""" 
-app = FastAPI(title="Animal Lens API")
+from sqlalchemy import text, select
+from .models import AnalysisResult
 
-# CORS 설정
+"""
+FastAPI Main Application File
+Roles:
+1. Define API endpoints (/api/upload, /api/results/{id}, etc.)
+2. Coordinate image upload and analysis processes
+3. Handle error processing and API responses
+4. Configure CORS and other middleware
+"""
+app = FastAPI(
+    title="Animal Lens API",
+    description="Animal detection and identification API"
+)
+
+# CORS
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Initialize services
+from .services.s3_service import s3_service
+from .services import rekognition_service
+
+@app.get("/")
+async def root():
+    """
+    Root route handler - Check if the API is running
+    """
+    return {
+        "status": "ok",
+        "message": "Animal Lens API is running"
+    }
+
 @app.post("/api/upload")
 async def upload_image(file: UploadFile):
     """
-    이미지 업로드 및 분석 엔드포인트
-    1. 이미지를 S3에 업로드
-    2. Rekognition으로 동물 분석
-    3. 결과를 DB에 저장
-    4. 동물 레이블 필터링 (confidence >= 80%)
-    5. 동물 레이블 검증 (DB에 있는지 확인)
-    6. 결과 반환
+    Image upload and analysis endpoint
     """
     try:
-        # 시작 로그
-        logger.info("=== Starting image upload and analysis ===")
-        logger.info(f"File details - name: {file.filename}, size: {file.size}, type: {file.content_type}")
-
-        # 파일 크기 검증 (5MB 제한)
-        contents = await file.read()
-        file_size_mb = len(contents) / (1024 * 1024)
-        logger.debug(f"File size: {file_size_mb:.2f}MB")
-
-        if file_size_mb > 5:
-            logger.warning(f"File too large: {file_size_mb:.2f}MB")
-            raise HTTPException(400, "File too large")
-            
-        # MIME 타입 검증
+        # Validate file type
         if not file.content_type.startswith('image/'):
-            raise HTTPException(400, "Invalid file type")
-            
-        # PIL을 사용한 이미지 파일 유효성 검증
-        try:
-            image = Image.open(io.BytesIO(contents))
-            image.verify()  # 이미지 파일 검증
-        except Exception:
-            raise HTTPException(400, "Invalid image file")
-            
-        # 파일 포인터 리셋 (검증 후 다시 처음부터 읽기 위해)
-        file.file = io.BytesIO(contents)
-            
-        # 트랜잭션으로 모든 작업 처리
-        async with database.transaction():
-            # S3 업로드 전
-            logger.info("Uploading to S3...")
-            image_url = await s3_service.upload_file(file)
-            logger.info(f"Successfully uploaded to S3: {image_url}")
-            
-            # Rekognition 분석 전
-            logger.info("Starting Rekognition analysis...")
-            labels = await rekognition_service.detect_labels(image_url)
-            logger.info(f"Rekognition labels received: {labels}")
-            
-            # 결과 처리 전
-            logger.info("Processing analysis results...")
-            result = await process_analysis_results(image_url, labels)
-            logger.info(f"Analysis complete. Result: {result}")
-            
+            raise HTTPException(status_code=400, detail="Only image files are allowed")
+        
+        # Validate file size (5MB limit)
+        contents = await file.read()
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+        
+        logger.info(f"Processing upload: {file.filename}, size: {len(contents)}")
+        
+        # Upload to S3
+        image_url = await s3_service.upload_file(contents, file.filename)
+        logger.info(f"Uploaded to S3: {image_url}")
+        
+        # Rekognition analysis
+        labels = await rekognition_service.detect_labels(image_url)
+        logger.info(f"Rekognition labels: {labels}")
+        
+        # Process results
+        result = await process_analysis_results(image_url, labels)
         return result
         
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
-        raise HTTPException(500, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await file.close()
 
 async def process_analysis_results(image_url: str, labels: list) -> dict:
-    """분석 결과를 처리하고 저장하는 함수"""
+    """Process and save analysis results"""
     logger.info("=== Starting analysis results processing ===")
     logger.debug(f"Image URL: {image_url}")
     logger.debug(f"All labels: {labels}")
     
-    # 일반적인 레이블 제외
+    # Exclude generic labels
     GENERIC_LABELS = {
         'Animal', 'Mammal', 'Wildlife', 'Pet', 'Fauna',
-        'Canine',  # 추가: 더 일반적인 분류
+        'Canine',  # Additional: more general classification
         'Carnivore',
-        'Feline'
+        'Feline','Face'
     }
     
-    # 레이블 우선순위 (더 구체적인 순서대로)
+    # Label priority (more specific order)
     PRIORITY_LABELS = [
-        'Golden Retriever', 'Labrador', 'Poodle',  # 구체적인 견종
-        'Dog',  # 일반적인 종
+        'Golden Retriever', 'Labrador', 'Poodle',  # More specific breeds
+        'Dog',  # General species
         'Puppy'  # 기타
     ]
     
-    # 신뢰도가 높은 레이블만 필터링
+    # Filter high confidence labels
     high_confidence_labels = [
         label for label in labels 
         if label["confidence"] >= 80 and 
@@ -121,7 +119,7 @@ async def process_analysis_results(image_url: str, labels: list) -> dict:
         logger.warning("No specific animals detected in image")
         raise HTTPException(400, "No specific animals detected in image")
     
-    # 우선순위에 따라 레이블 선택
+    # Select label based on priority
     selected_label = None
     for priority_name in PRIORITY_LABELS:
         matching_labels = [
@@ -132,16 +130,30 @@ async def process_analysis_results(image_url: str, labels: list) -> dict:
             selected_label = max(matching_labels, key=lambda x: x["confidence"])
             break
     
-    # 우선순위에 없는 경우 가장 높은 신뢰도의 레이블 선택
+    # If no priority label, select the highest confidence label
     if not selected_label:
         selected_label = max(high_confidence_labels, key=lambda x: x["confidence"])
     
     logger.info(f"Selected specific animal: {selected_label}")
     
-    # DB에서 동물 확인
+    # Check if animal is known in the database
     is_known_animal = await database.is_animal(selected_label["name"])
     logger.info(f"Database lookup - Animal '{selected_label['name']}' is known: {is_known_animal}")
     
+    if not is_known_animal:
+        logger.debug("Processing unknown animal")
+        try:
+            result = await database.save_unidentified_animal(
+                image_url=image_url,
+                label=selected_label["name"],
+                confidence=selected_label["confidence"]
+            )
+            logger.info(f"Successfully saved unidentified animal: {result}")  #log
+            return result
+        except Exception as e:
+            logger.error(f"Failed to save unidentified animal: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Database save failed")  #exception
+
     if is_known_animal:
         logger.debug("Processing known animal")
         result = await database.save_analysis_result(
@@ -150,11 +162,19 @@ async def process_analysis_results(image_url: str, labels: list) -> dict:
             confidence=selected_label["confidence"]
         )
         return {
-            "upload_id": str(result.id),
-            "image_url": image_url
+            # Same as Unknown Animal, use 'analysis_id' key
+            "analysis_id": str(result.id),
+            "image_url": image_url,
+            "label": selected_label["name"],
+            "confidence": selected_label["confidence"],
+            "message": "We are processing your image. Our team will review it soon."
+            # If needed, add/remove fields similar to the "message" field in Unknown Animal
         }
     else:
         logger.debug("Processing unknown animal")
+        # save_unidentified_animal() function already returns {"analysis_id": ..., "image_url":..., "label":..., "confidence":...}
+        # So, use the same structure
+        
         return await database.save_unidentified_animal(
             image_url=image_url,
             label=selected_label["name"],
@@ -165,22 +185,61 @@ async def process_analysis_results(image_url: str, labels: list) -> dict:
 async def test_connection():
     return {"status": "ok", "message": "Backend is running"}
 
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
 @app.get("/api/results/{result_id}")
-async def get_result(result_id: str):
-    """분석 결과 조회"""
+async def get_analysis_result(result_id: int, db: AsyncSession = Depends(get_db)):
+    # 1) Query AnalysisResult while joinedload matched_animal
+    query = (
+        select(AnalysisResult)
+        .options(joinedload(AnalysisResult.matched_animal))  
+        .where(AnalysisResult.id == result_id)
+    )
+
+    # 2) Execute query and get one AnalysisResult object
+    result = await db.execute(query)
+    analysis = result.scalar_one_or_none()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Result not found")
+
+    # 3) Create matched_animal data
+    matched_animal_data = None
+    if analysis.matched_animal:
+        matched_animal_data = {
+            "id": analysis.matched_animal.id,
+            "name": analysis.matched_animal.name,
+            "species": analysis.matched_animal.species,
+            "habitat": analysis.matched_animal.habitat,
+            "diet": analysis.matched_animal.diet,
+            "description": analysis.matched_animal.description
+        }
+
+    # 4) Configure JSON response
+    return {
+        "id": analysis.id,
+        "image_url": analysis.image_url,
+        "label": analysis.label,
+        "confidence": analysis.confidence,
+        "created_at": analysis.created_at,
+        # Include Animal information
+        "matched_animal": matched_animal_data
+    }
+
+@app.get("/api/db-test")
+async def test_db_connection():
+    """Test database connection"""
     try:
-        # 일반 분석 결과 조회
-        result = await database.get_analysis_result(result_id)
-        if result:
-            return result
-            
-        # 미확인 동물 결과 조회
-        result = await database.get_unidentified_animal(result_id)
-        if result:
-            return result
-            
-        raise HTTPException(404, "Result not found")
+        async with database.transaction() as session:
+            # Execute the simplest query
+            result = await session.execute(text("SELECT 1"))
+            # Process result without await and directly call scalar()
+            value = result.scalar()
+            logger.debug(f"Database test result: {value}")
+            return {"status": "ok", "message": "Database connection successful"}
     except Exception as e:
-        logger.error(f"Failed to get result: {str(e)}")
-        raise HTTPException(500, str(e))
+        logger.error(f"Database connection failed: {str(e)}")
+        raise HTTPException(500, f"Database connection failed: {str(e)}")
 

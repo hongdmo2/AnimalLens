@@ -23,6 +23,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Define component props interface
+
+
 interface FileUploadProps {
   onChange: (file?: File) => void;  // Callback function when file is selected
   value?: File;                     // Currently selected file

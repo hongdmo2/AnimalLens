@@ -13,54 +13,62 @@ Features:
 
 import boto3
 from ..config import settings
+from ..logger import logger
+from urllib.parse import urlparse
 
-# Initialize AWS Rekognition client with credentials
-rekognition_client = boto3.client(
-    'rekognition',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    region_name=settings.AWS_REGION
-)
-
-async def detect_labels(image_url: str) -> list:
-    """
-    Detect labels in an image stored in S3.
-    
-    Args:
-        image_url (str): Full S3 URL of the image
-            Format: https://bucket-name.s3.region.amazonaws.com/path/to/image.jpg
-    
-    Returns:
-        list: List of detected labels with confidence scores
-        
-    Raises:
-        Exception: If Rekognition analysis fails
-    """
-    # Extract bucket name and object key from S3 URL
-    bucket = settings.S3_BUCKET
-    key = image_url.split(f"{bucket}.s3.{settings.AWS_REGION}.amazonaws.com/")[1]
-    
-    try:
-        # Call Rekognition API to detect labels
-        response = rekognition_client.detect_labels(
-            Image={
-                'S3Object': {
-                    'Bucket': bucket,
-                    'Name': key
-                }
-            },
-            MaxLabels=10,
-            MinConfidence=70
+class RekognitionService:
+    def __init__(self):
+        """AWS Rekognition 서비스 초기화"""
+        self.client = boto3.client(
+            'rekognition',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_REGION
         )
+
+    async def detect_labels(self, image_url: str) -> list:
+        """
+        이미지에서 레이블(객체) 감지
         
-        # Format and return the results
-        return [
-            {
-                "name": label["Name"],
-                "confidence": label["Confidence"]
-            }
-            for label in response["Labels"]
-        ]
-    except Exception as e:
-        print(f"Error during Rekognition analysis: {str(e)}")
-        raise 
+        Args:
+            image_url (str): S3에 업로드된 이미지 URL
+            
+        Returns:
+            list: 감지된 레이블 목록
+        """
+        try:
+            # S3 URL에서 버킷과 키 추출
+            parsed_url = urlparse(image_url)
+            bucket = parsed_url.netloc.split('.')[0]
+            key = parsed_url.path.lstrip('/')
+            
+            # Rekognition API 호출
+            response = self.client.detect_labels(
+                Image={
+                    'S3Object': {
+                        'Bucket': bucket,
+                        'Name': key
+                    }
+                },
+                MaxLabels=10,
+                MinConfidence=70
+            )
+            
+            # 결과 처리
+            labels = [
+                {
+                    'name': label['Name'],
+                    'confidence': label['Confidence']
+                }
+                for label in response['Labels']
+            ]
+            
+            logger.info(f"Detected labels: {labels}")
+            return labels
+            
+        except Exception as e:
+            logger.error(f"Rekognition error: {e}")
+            raise
+
+# 서비스 인스턴스 생성
+rekognition_service = RekognitionService() 
