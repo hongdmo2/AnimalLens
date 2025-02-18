@@ -14,7 +14,7 @@
 
 ## 📸 Preview
 
-<img src="https://github.com/user-attachments/assets/df5eef92-baba-4e6c-8baa-8d3bf0526fc3" width="500">
+<img src="https://github.com/user-attachments/assets/df5eef92-baba-4e6c-8baa-8d3bf0526fc3" width="600">
 <img src="https://github.com/user-attachments/assets/2d11638d-3b8f-49da-a12f-9bbe499efe5c" width="500">
 <img src="https://github.com/user-attachments/assets/d9ef2b3d-f767-424e-a805-f9f719d145b3" width="500">
 
