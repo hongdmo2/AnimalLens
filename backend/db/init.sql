@@ -1,18 +1,16 @@
--- 주의: 이 스크립트는 최초 데이터베이스 설정 시 한 번만 실행합니다.
--- 재실행 시 기존 데이터가 삭제될 수 있습니다.
---목적
---데이터베이스 생성
---테이블 생성
---초기 동물 데이터 삽입
+-- warning: this script is only executed once for initial database setup.
+-- re-running it may delete existing data.
+-- purpose
+-- create database
+-- create tables
+-- insert initial animal data
 
 
--- 데이터베이스 생성
--- 최초 한번만 실행
-CREATE DATABASE animallens;
+-- create database
+-- only run once
+--CREATE DATABASE animallens;
 
--- 테이블 생성
-\c animallens
-
+-- create tables
 CREATE TABLE animals (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -31,7 +29,7 @@ CREATE TABLE analysis_results (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- 초기 동물 데이터 삽입
+-- insert initial animal data
 INSERT INTO animals (name, species, habitat, diet, description) VALUES
 ('Lion', 'Panthera leo', 'African savannas', 'Carnivore', 'The lion is the king of the jungle...'),
 ('Tiger', 'Panthera tigris', 'Asian forests', 'Carnivore', 'The largest of all wild cats...'),

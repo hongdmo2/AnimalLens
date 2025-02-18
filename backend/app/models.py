@@ -1,9 +1,11 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
 Base = declarative_base()
 
+# Animal model
 class Animal(Base):
     __tablename__ = "animals"
     
@@ -14,6 +16,7 @@ class Animal(Base):
     diet = Column(String)
     description = Column(String)
 
+# AnalysisResult model
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"
     
@@ -22,4 +25,6 @@ class AnalysisResult(Base):
     label = Column(String(100))
     confidence = Column(Float)
     matched_animal_id = Column(Integer, ForeignKey("animals.id"))
-    created_at = Column(DateTime, default=datetime.utcnow) 
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    matched_animal = relationship("Animal", backref="analysis_results") 

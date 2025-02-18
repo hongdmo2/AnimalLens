@@ -18,13 +18,17 @@ import { Button } from "@/components/ui/button";
 import { uploadImage } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
-export function UploadForm() {
+interface UploadFormProps {
+  onSubmit: (data: FormData) => Promise<void>;
+}
+
+export function UploadForm({ onSubmit }: UploadFormProps) {
   // State management
   const [file, setFile] = useState<File>();              // Selected file state
   const [isUploading, setIsUploading] = useState(false); // Upload progress state
   const [error, setError] = useState<string>();          // Error message state
   const [uploadProgress, setUploadProgress] = useState(0); // Upload progress percentage state
-  
+
   // File selection/drag & drop handler
   const handleFileChange = (selectedFile?: File) => {
     if (selectedFile) {
@@ -47,7 +51,6 @@ export function UploadForm() {
   const handleAnalyze = async () => {
     if (!file) return;
 
-    // Initialize upload state
     setIsUploading(true);
     setError(undefined);
     setUploadProgress(0);
@@ -57,14 +60,19 @@ export function UploadForm() {
       const response = await uploadImage(file, (progress) => {
         setUploadProgress(progress);
       });
-      // Redirect to result page on successful upload
-      window.location.href = `/result?id=${response.upload_id}`;
+
+      // Redirect directly using the response
+      if (response && response.id) {
+        window.location.href = `/result?id=${response.id}`;
+      } else {
+        console.log(response, "response");
+        console.log(response.id, "response.id");
+        throw new Error('Invalid response from server');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      // Reset states
       setIsUploading(false);
-      setUploadProgress(0);
     }
   };
 
@@ -76,14 +84,14 @@ export function UploadForm() {
         value={file}
         disabled={isUploading}
       />
-      
+
       {/* Error message display */}
       {error && (
         <div className="text-red-500 text-sm text-center">
           {error}
         </div>
       )}
-      
+
       {/* Upload progress display */}
       {isUploading && uploadProgress > 0 && (
         <div className="w-full max-w-xs mx-auto">
@@ -100,7 +108,7 @@ export function UploadForm() {
           </p>
         </div>
       )}
-      
+
       {/* Analysis button */}
       <div className="flex justify-center">
         <Button

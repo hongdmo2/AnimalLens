@@ -2,11 +2,11 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-# .env 파일 로드
+# load .env file
 load_dotenv()
 
 def check_database():
-    # 연결 정보
+    # connection information
     conn_params = {
         'dbname': 'animallens',
         'user': os.getenv('DB_USER'),
@@ -16,23 +16,23 @@ def check_database():
     }
     
     try:
-        # 데이터베이스 연결
+        # connect to database
         conn = psycopg2.connect(**conn_params)
         cur = conn.cursor()
         
-        # 테이블 목록 조회
+        # query table list
         cur.execute("""
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public'
         """)
         tables = cur.fetchall()
-        print("\n=== 테이블 목록 ===")
+        print("\n=== Table list ===")
         for table in tables:
             print(table[0])
             
-        # animals 테이블 데이터 조회
-        print("\n=== Animals 테이블 데이터 ===")
+        # query animals table data
+        print("\n=== Animals table data ===")
         cur.execute("SELECT * FROM animals")
         animals = cur.fetchall()
         for animal in animals:

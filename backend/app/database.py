@@ -2,235 +2,194 @@
 Database Management Module
 
 This module handles all database operations for the Animal Lens application.
-It provides functionality for managing animal data and analysis results.
-
-Features:
-1. Database connection and session management
-2. Animal data querying and storage
-3. Analysis results storage and retrieval
-4. Unidentified animal data management
-5. Asynchronous database operations
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, text
+from fastapi import HTTPException  # ✅ FastAPI exception handling added
 from .config import settings
 from .models import Animal, AnalysisResult
 from typing import List, Dict
 from contextlib import asynccontextmanager
 from .logger import logger
+import ssl
 
-engine = create_async_engine(settings.DATABASE_URL)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession)
+# create SSL context
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
+engine = create_async_engine(
+    settings.DATABASE_URL.replace('postgresql', 'postgresql+asyncpg'),
+    echo=True,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    #connect_args={"ssl": ssl_context}
+)
+
+AsyncSessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
+# Database class
 class Database:
     def __init__(self):
         self.session_maker = AsyncSessionLocal
-    
+
+    # Transaction context manager   
     @asynccontextmanager
     async def transaction(self):
         """Transaction context manager for database operations"""
         async with self.session_maker() as session:
             async with session.begin():
                 yield session
-    
+
+    # Check if the given label matches a known animal.
     async def is_animal(self, label: str) -> bool:
         """
         Check if the given label matches a known animal.
-        
-        Args:
-            label (str): The label to check
-            
-        Returns:
-            bool: True if the label matches a known animal, False otherwise
         """
         async with self.session_maker() as session:
-            # Case-insensitive partial match search
             query = select(Animal).filter(
-                Animal.name.ilike(f"%{label}%") |  # Search by name
-                Animal.species.ilike(f"%{label}%")  # Search by species
+                Animal.name.ilike(f"%{label}%") | Animal.species.ilike(f"%{label}%")
             )
             result = await session.execute(query)
             is_match = bool(result.scalar_one_or_none())
             logger.debug(f"Checking if '{label}' is known animal. Query result: {is_match}")
             return is_match
-    
-    async def save_analysis_result(
-        self,
-        image_url: str,
-        label: str,
-        confidence: float
-    ) -> AnalysisResult:
+
+    # Save analysis result to database.
+    async def save_analysis_result(self, image_url: str, label: str, confidence: float) -> AnalysisResult:
         """
         Save analysis result to database.
-        
-        Args:
-            image_url (str): URL of the analyzed image
-            label (str): Detected label
-            confidence (float): Confidence score
-            
-        Returns:
-            AnalysisResult: Created analysis result object
         """
         async with self.session_maker() as session:
-            # Find matching animal
             query = select(Animal).filter(Animal.name.ilike(f"%{label}%"))
             result = await session.execute(query)
             animal = result.scalar_one_or_none()
-            
-            # Save result
-            result = AnalysisResult(
+
+            analysis_result = AnalysisResult(
                 image_url=image_url,
                 label=label,
                 confidence=confidence,
                 matched_animal_id=animal.id if animal else None
             )
-            session.add(result)
+            session.add(analysis_result)
             await session.commit()
-            await session.refresh(result)
-            return result
+            await session.refresh(analysis_result)
+            return analysis_result
 
-    async def find_matching_animals(self, label: str, confidence: float) -> List[Dict]:
-        """
-        Find all animals matching the given label.
-        
-        Args:
-            label (str): Label to match
-            confidence (float): Confidence score
-            
-        Returns:
-            List[Dict]: List of matching animals with their details
-        """
-        async with self.session_maker() as session:
-            query = select(Animal).filter(Animal.name.ilike(f"%{label}%"))
-            result = await session.execute(query)
-            animals = result.scalars().all()
-            
-            return [
-                {
-                    "id": animal.id,
-                    "name": animal.name,
-                    "confidence": confidence,
-                    "habitat": animal.habitat,
-                    "diet": animal.diet,
-                    "description": animal.description
-                }
-                for animal in animals
-            ]
-
-    async def get_analysis_result(self, result_id: str) -> Dict:
-        """
-        Retrieve analysis result by ID.
-        
-        Args:
-            result_id (str): ID of the analysis result
-            
-        Returns:
-            Dict: Analysis result with matched animal data if available
-        """
-        async with self.session_maker() as session:
-            try:
-                numeric_id = int(result_id)
-                
-                # Query result with matched animal data
-                query = select(AnalysisResult, Animal).join(
-                    Animal,
-                    AnalysisResult.matched_animal_id == Animal.id,
-                    isouter=True
-                ).filter(AnalysisResult.id == numeric_id)
-                
-                result = await session.execute(query)
-                row = result.first()
-                
-                if not row:
-                    return None
-                
-                analysis_result, animal = row
-                
-                return {
-                    "id": str(analysis_result.id),
-                    "image_url": analysis_result.image_url,
-                    "label": analysis_result.label,
-                    "confidence": analysis_result.confidence,
-                    "animal": {
-                        "name": animal.name,
-                        "species": animal.species,
-                        "habitat": animal.habitat,
-                        "diet": animal.diet,
-                        "description": animal.description
-                    } if animal else None
-                }
-            except ValueError:
-                return None
-
-    async def save_unidentified_animal(
-        self,
-        image_url: str,
-        label: str,
-        confidence: float
-    ) -> Dict:
+    # Save unidentified animal data.
+    async def save_unidentified_animal(self, image_url: str, label: str, confidence: float) -> Dict:
         """
         Save unidentified animal data.
-        
-        Args:
-            image_url (str): URL of the image
-            label (str): Detected label
-            confidence (float): Confidence score
-            
-        Returns:
-            Dict: Saved unidentified animal data
         """
+        logger.info(f"Attempting to save unidentified animal: label={label}, confidence={confidence}, image_url={image_url}")
+
         async with self.session_maker() as session:
-            unidentified = {
-                'label': label,
-                'confidence': confidence,
-                'image_url': image_url
-            }
-            
-            query = text("""
-                INSERT INTO unidentified_animals (label, confidence, image_url)
-                VALUES (:label, :confidence, :image_url)
-                RETURNING id
-            """)
-            result = await session.execute(query, unidentified)
-            await session.commit()
-            
-            row = result.first()
-            unidentified_id = str(row[0]) if row else None
-            
-            return {
-                "upload_id": unidentified_id,
-                "image_url": image_url,
+            try:
+
+                query_unidentified = text("""
+                    INSERT INTO unidentified_animals (
+                        label,
+                        confidence,
+                        image_url
+                    )
+                    VALUES (
+                        :label,
+                        :confidence,
+                        :image_url
+                    )
+                        RETURNING id
+                    """)
+
+                result = await session.execute(query_unidentified, {
                 "label": label,
                 "confidence": confidence,
-                "message": "We don't have enough data about this animal yet. Our team will review and add it to our database soon."
-            }
+                "image_url": image_url
+                })
+                await session.commit()
+                unidentified_id = result.scalar()
 
+                if not unidentified_id:
+                    logger.error("Failed to insert into `unidentified_animals`")
+                    raise HTTPException(status_code=500, detail="Failed to insert unidentified animal")
+
+                logger.info(f"Unidentified animal inserted with ID: {unidentified_id}")
+
+
+
+
+                query_analysis = text("""
+                    INSERT INTO analysis_results (
+                        image_url,
+                        label,
+                        confidence,
+                        created_at
+                    )
+                    VALUES (
+                        :image_url,
+                        :label,
+                        :confidence,
+                        now()
+                    )
+                    RETURNING id
+                """)
+                result_analysis = await session.execute(query_analysis, {
+                    "image_url": image_url,
+                    "label": label,
+                    "confidence": confidence
+                })
+                await session.commit()
+                analysis_id = result_analysis.scalar()
+
+                logger.info(f"Analysis result inserted with ID: {analysis_id}")
+
+                return {
+                    "unidentified_id": unidentified_id,
+                    "analysis_id": analysis_id,
+                    "image_url": image_url,
+                    "label": label,
+                    "confidence": confidence,
+                    "message": "We are processing your image. Our team will review it soon."
+                }
+
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Error while saving unidentified animal: {e}", exc_info=True)
+                raise HTTPException(status_code=500, detail="Database error while saving unidentified animal")
+
+    # Retrieve unidentified animal data by ID.
     async def get_unidentified_animal(self, result_id: str) -> Dict:
         """
         Retrieve unidentified animal data by ID.
-        
-        Args:
-            result_id (str): ID of the unidentified animal record
-            
-        Returns:
-            Dict: Unidentified animal data if found
         """
         async with self.session_maker() as session:
             try:
                 numeric_id = int(result_id)
+                logger.info(f"Fetching animal with ID: {numeric_id}")
                 query = text("""
-                    SELECT id, label, confidence, image_url
+                    SELECT 
+                        id,
+                        label,
+                        confidence,
+                        image_url
                     FROM unidentified_animals
                     WHERE id = :id
                 """)
                 result = await session.execute(query, {"id": numeric_id})
                 row = result.first()
+
                 
-                if not row:
-                    return None
-                    
+                if row is None:
+                    logger.error(f"Unidentified animal with ID {result_id} not found in database")
+                    raise HTTPException(status_code=404, detail="Unidentified animal not found")
+                
+                logger.info(f"Retrieved row: {row}")
+
                 return {
                     "id": str(row.id),
                     "image_url": row.image_url,
@@ -239,6 +198,6 @@ class Database:
                     "message": "We don't have enough data about this animal yet. Our team will review and add it to our database soon."
                 }
             except ValueError:
-                return None
-
-database = Database()
+                raise HTTPException(status_code=400, detail="Invalid ID format")
+# Database instance
+database = Database()  

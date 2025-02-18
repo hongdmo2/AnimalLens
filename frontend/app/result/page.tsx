@@ -101,11 +101,11 @@ export default function ResultPage() {
         {/* Image Display */}
         <div className="relative overflow-hidden rounded-lg bg-gray-100 shadow-inner">
           {result.image_url ? (
-            <Image 
-              src={result.image_url} 
-              alt="Uploaded" 
-              width={500}  // 적절한 크기로 조정
-              height={300} 
+            <Image
+              src={result.image_url}
+              alt="Uploaded"
+              width={500} 
+              height={300}
               priority
             />
           ) : (
@@ -124,26 +124,32 @@ export default function ResultPage() {
           </div>
 
           {/* Animal Information (displayed only for known animals) */}
-          {result.animal && (
+          {result.matched_animal ? (
             <div className="bg-gray-50 rounded-lg p-6 space-y-4 shadow-inner">
               <h2 className="text-2xl font-semibold text-blue-600">Animal Information</h2>
               <div className="space-y-2 text-gray-700">
                 <p>
-                  <strong className="text-blue-500">Species:</strong> {result.animal.species}
+                  <strong className="text-blue-500">Species:</strong> {result.matched_animal.species}
                 </p>
                 <p>
-                  <strong className="text-blue-500">Habitat:</strong> {result.animal.habitat}
+                  <strong className="text-blue-500">Habitat:</strong> {result.matched_animal.habitat}
                 </p>
                 <p>
-                  <strong className="text-blue-500">Diet:</strong> {result.animal.diet}
+                  <strong className="text-blue-500">Diet:</strong> {result.matched_animal.diet}
                 </p>
                 <p>
-                  <strong className="text-blue-500">Description:</strong> {result.animal.description}
+                  <strong className="text-blue-500">Description:</strong> {result.matched_animal.description}
                 </p>
               </div>
             </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-6 space-y-4 shadow-inner">
+              <h2 className="text-2xl font-semibold text-blue-600">Animal Information</h2>
+              <p>We don’t have detailed information about this animal yet. Our team will review it soon!</p>
+            </div>
           )}
         </div>
+
 
         {/* New Analysis Button */}
         <div className="flex justify-center">

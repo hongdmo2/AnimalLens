@@ -12,77 +12,81 @@ Features:
 """
 
 import boto3
-from fastapi import UploadFile
 from ..config import settings
+from ..logger import logger
 import uuid
+import os
+import io
 
-# Initialize AWS S3 client with credentials
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    region_name=settings.AWS_REGION
-)
+class S3Service:
+    def __init__(self):
+        try:
+            self.s3_client = boto3.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=settings.AWS_REGION
+            )
+            self.bucket_name = settings.S3_BUCKET
+            logger.info("S3 service initialized successfully")
+            self.configure_bucket_cors()
+        except Exception as e:
+            logger.error(f"Failed to initialize S3 service: {e}")
+            raise
 
-async def upload_file(file: UploadFile) -> str:
-    """
-    Upload a file to S3 bucket and return its URL.
-    
-    Args:
-        file (UploadFile): FastAPI UploadFile object
-        
-    Returns:
-        str: Public URL of the uploaded file
-        
-    Raises:
-        Exception: If file upload fails
-    """
-    # Generate unique filename with UUID
-    file_extension = file.filename.split('.')[-1]
-    file_key = f"uploads/{uuid.uuid4()}.{file_extension}"
-    
-    # Upload file to S3 without ACL
-    s3_client.upload_fileobj(
-        file.file,
-        settings.S3_BUCKET,
-        file_key,
-        ExtraArgs={
-            'ContentType': file.content_type
-        }
-    )
-    
-    # Generate and return S3 URL
-    url = f"https://{settings.S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{file_key}"
-    return url
+    def configure_bucket_cors(self):
+        """S3 버킷의 CORS 설정"""
+        try:
+            cors_configuration = {
+                'CORSRules': [{
+                    'AllowedHeaders': ['*'],
+                    'AllowedMethods': ['GET', 'POST', 'PUT'],
+                    'AllowedOrigins': ['*'],
+                    'ExposeHeaders': []
+                }]
+            }
+            self.s3_client.put_bucket_cors(
+                Bucket=self.bucket_name,
+                CORSConfiguration=cors_configuration
+            )
+            logger.info("Successfully configured CORS for S3 bucket")
+        except Exception as e:
+            logger.error(f"Failed to configure CORS: {e}")
+            # CORS 설정 실패는 치명적이지 않으므로 예외를 다시 발생시키지 않음
 
-def configure_bucket_cors():
-    """
-    Configure CORS settings for S3 bucket.
-    
-    Sets up CORS rules to allow frontend access to bucket resources.
-    This function is called on application startup.
-    
-    Note:
-        Failure to configure CORS will not stop the server from running
-    """
-    try:
-        cors_configuration = {
-            'CORSRules': [{
-                'AllowedHeaders': ['*'],
-                'AllowedMethods': ['GET', 'POST'],
-                'AllowedOrigins': [settings.FRONTEND_URL],
-                'ExposeHeaders': ['ETag'],
-                'MaxAgeSeconds': 3000
-            }]
-        }
-        
-        s3_client.put_bucket_cors(
-            Bucket=settings.S3_BUCKET,
-            CORSConfiguration=cors_configuration
-        )
-    except Exception as e:
-        print(f"Error configuring CORS: {str(e)}")
-        # Continue running even if CORS configuration fails
+    async def upload_file(self, file_content: bytes, original_filename: str) -> str:
+        """
+        파일을 S3에 업로드하고 URL을 반환
+        """
+        try:
+            # 파일 이름에 UUID 추가
+            file_extension = os.path.splitext(original_filename)[1]
+            filename = f"{uuid.uuid4()}{file_extension}"
+            
+            # S3에 업로드
+            self.s3_client.upload_fileobj(
+                io.BytesIO(file_content),
+                self.bucket_name,
+                filename,
+                ExtraArgs={'ContentType': 'image/jpeg'}
+            )
+            
+            # S3 URL 생성
+            url = f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{filename}"
+            logger.info(f"File uploaded successfully: {url}")
+            return url
+            
+        except Exception as e:
+            logger.error(f"Failed to upload file to S3: {e}")
+            raise
 
-# Configure CORS on startup
-configure_bucket_cors() 
+# 서비스 인스턴스 생성을 지연시킴
+_instance = None
+
+def get_s3_service():
+    global _instance
+    if _instance is None:
+        _instance = S3Service()
+    return _instance
+
+s3_service = get_s3_service() 
